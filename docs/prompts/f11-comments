@@ -1,0 +1,386 @@
+# F11 – Comments
+
+Status: Ready
+
+Version: 1.0
+
+Dependencies
+
+✅ F0 – Frontend Foundation
+✅ F1 – Design System
+✅ F2 – Authentication
+✅ F3 – Application Layout
+✅ F4 – Dashboard
+✅ F5 – Projects Module
+✅ F6 – Project Workspace
+✅ F7 – Timeline
+✅ F8 – Memories
+✅ F9 – Files
+✅ F10 – Team
+
+Backend
+
+✅ Comments API Completed
+
+---
+
+# Goal
+
+Build the Comments module for project memories.
+
+Comments allow workspace members to collaborate around a memory, discuss uploaded files, and maintain project context.
+
+The feature should feel similar to comments in GitHub, Notion, Linear, or Jira.
+
+---
+
+# Scope
+
+Build
+
+- Comments list
+- Comment item
+- Add comment form
+- Delete comment
+- Loading state
+- Empty state
+- Error state
+
+Integrate with the existing backend.
+
+No mock data.
+
+---
+
+# User Experience
+
+The experience should feel lightweight and collaborative.
+
+Prioritize
+
+- readability
+- quick interaction
+- minimal friction
+- clear hierarchy
+
+Comments should appear instantly after successful submission using React Query invalidation.
+
+---
+
+# Backend
+
+Use the existing backend.
+
+Use only the provided APIs.
+
+Do not redesign backend endpoints.
+
+Typical operations include
+
+GET comments
+
+POST comment
+
+DELETE comment
+
+Use TanStack Query.
+
+---
+
+# Architecture
+
+Separate
+
+Page
+
+Comments container
+
+Comments list
+
+Comment item
+
+Comment composer
+
+Delete confirmation
+
+Query hook
+
+Mutation hooks
+
+API service
+
+Types
+
+Query keys
+
+Utilities
+
+Never fetch data directly inside UI components.
+
+---
+
+# Motion
+
+Use Motion (motion.dev) for subtle, premium interactions.
+
+Recommended
+
+• Page fade
+
+• Stagger comment appearance
+
+• Comment fade-in
+
+• Composer expand animation
+
+• Delete animation
+
+• Hover elevation
+
+Animations should feel similar to
+
+Linear
+
+Notion
+
+GitHub
+
+Avoid decorative animations.
+
+---
+
+# Motion Primitives
+
+Reuse Motion Primitives wherever possible.
+
+Examples
+
+FadeIn
+
+SlideUp
+
+StaggerContainer
+
+AnimatedList
+
+ScaleIn
+
+Do not duplicate animation logic.
+
+---
+
+# React Bits
+
+Use React Bits selectively.
+
+Good candidates
+
+• Empty comments illustration
+
+• Loading skeleton
+
+• Animated placeholder
+
+• Micro interactions
+
+Avoid flashy hero animations.
+
+Keep the application enterprise-focused.
+
+---
+
+# UI
+
+Each comment displays
+
+Avatar
+
+Name
+
+Timestamp
+
+Comment text
+
+Delete button (if permitted)
+
+Composer appears at the bottom.
+
+Support multiline comments.
+
+Auto-focus after opening the memory.
+
+---
+
+# Empty State
+
+Show a premium empty state.
+
+Example
+
+"No comments yet."
+
+Encourage collaboration.
+
+---
+
+# Loading
+
+Skeleton comments.
+
+Smooth transition to loaded content.
+
+---
+
+# Error State
+
+Friendly retry UI.
+
+Surface backend messages.
+
+---
+
+# Design Philosophy
+
+Match the visual quality of
+
+Linear
+
+Vercel Dashboard
+
+GitHub
+
+Notion
+
+Clerk
+
+Use
+
+clean spacing
+
+minimal colors
+
+subtle shadows
+
+premium typography
+
+consistent animations
+
+No visual clutter.
+
+---
+
+# Definition of Done
+
+✓ Backend integration
+
+✓ React Query
+
+✓ Comments list
+
+✓ Add comment
+
+✓ Delete comment
+
+✓ Loading state
+
+✓ Empty state
+
+✓ Error state
+
+✓ Motion animations
+
+✓ Motion Primitives
+
+✓ React Bits integration where appropriate
+
+✓ Responsive
+
+✓ Lint
+
+✓ Typecheck
+
+✓ Production build
+
+✓ Local verification
+
+✓ Git commit
+
+✓ Git push
+
+---
+
+# Claude Prompt
+
+Continue F11 (Comments).
+
+The backend is complete.
+
+Do not regenerate previous work.
+
+Only build the Comments feature.
+
+Requirements
+
+• Comments list
+
+• Comment composer
+
+• Add comment
+
+• Delete comment
+
+• React Query integration
+
+• Dedicated API service
+
+• Query hooks
+
+• Mutation hooks
+
+• Motion animations
+
+• Motion Primitives
+
+• React Bits for loading and empty states only
+
+Use the existing project architecture.
+
+Do not redesign completed pages.
+
+Do not regenerate existing files.
+
+Generate only the files required for F11.
+
+After implementation
+
+1. Run ESLint
+
+2. Run TypeScript typecheck
+
+3. Attempt production build
+
+4. Report verification results
+
+5. Wait for local verification before proceeding.
+
+UI Standards (Applies to all remaining frontend phases)
+
+Memovix should look like a premium enterprise SaaS.
+
+Reference products
+
+• Linear
+• Vercel Dashboard
+• GitHub
+• Notion
+• Clerk
+
+Guidelines
+
+• Use Motion for meaningful transitions.
+• Reuse Motion Primitives instead of duplicating animations.
+• Use React Bits only where it genuinely improves UX (loading, empty states, dashboards, AI features).
+• Keep animations subtle and purposeful.
+• Prefer reusable components over one-off implementations.
+• Do not introduce decorative or distracting effects.
+• Maintain consistency with the existing design system and component architecture.
