@@ -1,0 +1,13 @@
+ 
+node_modules
+**/node_modules
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Prisma generated files
+/src/generated/prisma
+
+server.zip
+*.zip
