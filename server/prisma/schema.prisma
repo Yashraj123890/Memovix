@@ -1,0 +1,750 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Tenant {
+  id                String             @id @default(cuid())
+  name              String
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  clientInvitations ClientInvitation[]
+  memberInvitations MemberInvitation[]
+  projects          Project[]
+  users             User[]
+
+  @@map("tenants")
+}
+
+model User {
+  id                    String               @id @default(cuid())
+  tenantId              String
+  name                  String
+  email                 String               @unique
+  passwordHash          String
+  role                  UserRole
+  emailVerified         Boolean              @default(false)
+  isActive              Boolean              @default(true)
+  // Optional user-profile fields (self-service Settings). avatarKey is the S3
+  // object key for the uploaded photo (never sent to the client — a signed URL
+  // is derived on read); title/about are short free-text profile fields.
+  avatarKey             String?
+  title                 String?
+  about                 String?
+  createdAt             DateTime             @default(now())
+  updatedAt             DateTime             @updatedAt
+  comments              Comment[]
+  uploadedFiles         ProjectFile[]
+  timelines             Timeline[]
+  notifications         Notification[]
+  auditLogs             AuditLog[]
+  projectMemberships    ProjectMember[]
+  passwordResetTokens   PasswordResetToken[]
+  clientInvitationsSent ClientInvitation[]   @relation("ClientInvitations")
+  sentInvitations       MemberInvitation[]   @relation("UserInvitations")
+  createdMemories       Memory[]             @relation("MemoryCreator")
+  clientProjects        ProjectClient[]
+  ownedProjects         Project[]            @relation("ProjectOwner")
+  deliverablesCreated   Deliverable[]        @relation("DeliverableCreator")
+  deliverableVersions   DeliverableVersion[] @relation("DeliverableVersionUploader")
+  revisionRequests      RevisionRequest[]    @relation("RevisionRequester")
+  decisionLogs          DecisionLog[]        @relation("DecisionLogger")
+  meetingNotes          MeetingNote[]        @relation("MeetingNoteCreator")
+  refreshTokens         RefreshToken[]
+  tenant                Tenant               @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId])
+  @@map("users")
+}
+
+model Project {
+  id                String             @id @default(cuid())
+  tenantId          String
+  ownerId           String
+  name              String
+  description       String?
+  status            ProjectStatus      @default(ACTIVE)
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  files             ProjectFile[]
+  timelines         Timeline[]
+  clientInvitations ClientInvitation[]
+  memories          Memory[]
+  projectClients    ProjectClient[]
+  owner             User               @relation("ProjectOwner", fields: [ownerId], references: [id])
+  tenant            Tenant             @relation(fields: [tenantId], references: [id])
+  notifications     Notification[]
+  auditLogs         AuditLog[]
+  members           ProjectMember[]
+  deliverables      Deliverable[]
+  decisionLogs      DecisionLog[]
+  requirements      Requirement[]
+  meetingNotes      MeetingNote[]
+  actionItems       ActionItem[]
+  scopeFlags        ScopeFlag[]
+  searchableChunks  SearchableChunk[]
+
+  @@index([tenantId])
+  @@index([ownerId])
+  @@map("projects")
+}
+
+model MemberInvitation {
+  id          String           @id @default(cuid())
+  email       String
+  token       String           @unique
+  status      InvitationStatus @default(PENDING)
+  tenantId    String
+  invitedById String
+  expiresAt   DateTime
+  acceptedAt  DateTime?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  invitedBy   User             @relation("UserInvitations", fields: [invitedById], references: [id], onDelete: Cascade)
+  tenant      Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, email])
+  @@index([tenantId])
+  @@index([email])
+  @@map("member_invitations")
+}
+
+model ClientInvitation {
+  id          String           @id @default(cuid())
+  email       String
+  token       String           @unique
+  status      InvitationStatus @default(PENDING)
+  tenantId    String
+  projectId   String
+  invitedById String
+  expiresAt   DateTime
+  acceptedAt  DateTime?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  invitedBy   User             @relation("ClientInvitations", fields: [invitedById], references: [id], onDelete: Cascade)
+  project     Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  tenant      Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([projectId])
+  @@index([email])
+  @@map("client_invitations")
+}
+
+model ProjectClient {
+  id        String   @id @default(cuid())
+  projectId String
+  clientId  String
+  createdAt DateTime @default(now())
+  client    User     @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, clientId])
+  @@index([projectId])
+  @@index([clientId])
+  @@map("project_clients")
+}
+
+model Memory {
+  id          String           @id @default(cuid())
+  title       String
+  content     String
+  category    MemoryCategory
+  customCategory String?
+  projectId   String
+  createdById String
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  comments    Comment[]
+  embedding   MemoryEmbedding?
+  createdBy   User             @relation("MemoryCreator", fields: [createdById], references: [id], onDelete: Cascade)
+  project     Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+  @@index([createdById])
+  @@index([category])
+  @@map("memories")
+}
+
+model ProjectFile {
+  id           String           @id @default(cuid())
+  originalName String
+  storageKey   String           @unique
+  mimeType     String
+  size         Int
+  projectId    String
+  uploadedById String
+  ingestStatus FileIngestStatus @default(PENDING)
+  ingestError  String?
+  createdAt    DateTime         @default(now())
+  comments     Comment[]
+  chunks       DocumentChunk[]
+  requirements Requirement[]
+  project      Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  uploadedBy   User             @relation(fields: [uploadedById], references: [id])
+
+  @@index([projectId])
+  @@index([uploadedById])
+  @@index([ingestStatus])
+}
+
+enum FileIngestStatus {
+  PENDING
+  PROCESSING
+  INDEXED
+  FAILED
+  SKIPPED
+}
+
+model DocumentChunk {
+  id             String                @id @default(cuid())
+  fileId         String
+  // Denormalized from the file for a fast project-scoped pre-filter before the
+  // vector distance operator (blueprint §6.3). Not a FK — cleanup cascades via
+  // the file relation below when a project (and thus its files) is deleted.
+  projectId      String
+  chunkIndex     Int
+  content        String
+  // Lightweight positional metadata into the normalized extracted text — for
+  // debugging and future citation highlighting.
+  characterStart Int
+  characterEnd   Int
+  tokenEstimate  Int
+  // pgvector column. Prisma cannot express the dimension/index, so db push
+  // creates an untyped `vector` column and scripts/init-document-chunks-vector.ts
+  // sets it to vector(<EMBEDDING_DIMENSION>) and adds the HNSW index — same
+  // pattern as MemoryEmbedding. Written/queried via raw SQL.
+  embedding      Unsupported("vector")
+  createdAt      DateTime              @default(now())
+
+  file ProjectFile @relation(fields: [fileId], references: [id], onDelete: Cascade)
+
+  @@unique([fileId, chunkIndex])
+  @@index([fileId])
+  @@index([projectId])
+  @@map("document_chunks")
+}
+
+model Timeline {
+  id          String   @id @default(cuid())
+  projectId   String
+  userId      String?
+  action      String
+  description String
+  createdAt   DateTime @default(now())
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user        User?    @relation(fields: [userId], references: [id])
+
+  @@index([projectId])
+  @@index([createdAt])
+}
+
+model Comment {
+  id        String       @id @default(cuid())
+  content   String
+  memoryId  String?
+  fileId    String?
+  userId    String
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+  file      ProjectFile? @relation(fields: [fileId], references: [id], onDelete: Cascade)
+  memory    Memory?      @relation(fields: [memoryId], references: [id], onDelete: Cascade)
+  user      User         @relation(fields: [userId], references: [id])
+
+  @@index([memoryId])
+  @@index([fileId])
+  @@index([userId])
+}
+
+model MemoryEmbedding {
+  id        String                @id @default(cuid())
+  memoryId  String                @unique
+  model     String
+  embedding Unsupported("vector")
+  createdAt DateTime              @default(now())
+  updatedAt DateTime              @updatedAt
+  memory    Memory                @relation(fields: [memoryId], references: [id], onDelete: Cascade)
+}
+
+/// Origin kind for a SearchableChunk row. Timeline is intentionally NOT a member:
+/// project activity is retrieved as STRUCTURED context (a separate query path),
+/// not embedded here. New content types are added by extending this enum (a
+/// `db push`) plus registering an ingestion adapter in phase P1.
+enum SearchableSourceType {
+  MEMORY
+  DOCUMENT
+  REQUIREMENT
+  DECISION
+  MEETING_NOTE
+  DELIVERABLE
+  COMMENT
+}
+
+/// Unified Retrieval index (Unified Retrieval phase — P0, storage foundation
+/// only). A single polymorphic, project-scoped pgvector store over all
+/// text-bearing project content, so AI Chat/Search can retrieve across the whole
+/// project graph from ONE index instead of the fragmented memories +
+/// document_chunks pair.
+///
+/// Populated by the ingestion registry (P1) and queried by a unified retriever
+/// (P2) — NEITHER exists yet; this milestone lands the table/index/RLS only and
+/// touches no retrieval workflow or legacy store.
+///
+/// `sourceType` + `sourceId` identify the origin row. `sourceId` is deliberately
+/// NOT a foreign key (it is polymorphic across tables); cleanup when an origin
+/// row is deleted is the job of the P1 delete hooks, while whole-project deletes
+/// cascade via the `projectId` FK below. `chunkIndex` is 0 for whole-record
+/// sources and 0..N for chunked documents. `metadata` carries per-type display
+/// info (e.g. fileName, title) for citations without a second lookup.
+///
+/// The `embedding` column is pgvector: `db push` creates it untyped, and
+/// scripts/init-searchable-chunk-vector.ts sets vector(<EMBEDDING_DIMENSION>) and
+/// adds the HNSW cosine index — same pattern as document_chunks / MemoryEmbedding.
+model SearchableChunk {
+  id         String                @id @default(cuid())
+  projectId  String
+  sourceType SearchableSourceType
+  sourceId   String
+  chunkIndex Int                   @default(0)
+  content    String
+  metadata   Json?
+  embedding  Unsupported("vector")
+  createdAt  DateTime              @default(now())
+  updatedAt  DateTime              @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([sourceType, sourceId, chunkIndex])
+  @@index([projectId])
+  @@map("searchable_chunks")
+}
+
+model Notification {
+  id String @id @default(cuid())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  projectId String?
+  project   Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  type NotificationType
+
+  title   String
+  message String
+
+  isRead Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([projectId])
+  @@index([isRead])
+}
+
+enum UserRole {
+  OWNER
+  MEMBER
+  CLIENT
+}
+
+enum InvitationStatus {
+  PENDING
+  ACCEPTED
+  EXPIRED
+}
+
+enum TenantPlan {
+  FREE
+  PRO
+}
+
+enum ProjectStatus {
+  ACTIVE
+  COMPLETED
+  ARCHIVED
+}
+
+enum MemoryCategory {
+  NOTE
+  DECISION
+  MEETING
+  FEATURE
+  BUG
+  API
+  DOCUMENTATION
+  OTHER
+}
+
+enum NotificationType {
+  MEMORY_CREATED
+  FILE_UPLOADED
+  COMMENT_ADDED
+  MEMBER_INVITED
+  CLIENT_INVITED
+  DELIVERABLE_SUBMITTED
+  DELIVERABLE_APPROVED
+  DELIVERABLE_REVISION_REQUESTED
+  SYSTEM
+}
+
+model AuditLog {
+  id String @id @default(cuid())
+
+  tenantId String
+
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id])
+
+  projectId String?
+  project   Project? @relation(fields: [projectId], references: [id])
+
+  action     String
+  entityType String
+  entityId   String?
+
+  details Json?
+
+  createdAt DateTime @default(now())
+
+  @@index([tenantId])
+  @@index([projectId])
+  @@index([userId])
+  @@index([createdAt])
+}
+
+model ProjectMember {
+  id String @id @default(cuid())
+
+  projectId String
+  userId    String
+
+  role UserRole
+
+  joinedAt DateTime @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, userId])
+  @@index([projectId])
+  @@index([userId])
+}
+
+/// Refresh-token session store (blueprint §13.1). The refresh token itself is a
+/// signed JWT (JWT_REFRESH_SECRET) carrying a random `jti`; this table is the
+/// server-side allowlist that makes it revocable. Only `sha256(jti)` is stored
+/// (`jtiHash`) — never the raw jti or the raw token — so the DB is independent
+/// of the JWT representation and a table leak exposes nothing usable. Lookup on
+/// refresh is by `sha256(jti)`. Rotation revokes the old row (`revokedAt`) and
+/// records the successor in `replacedById` (a non-FK audit pointer) so a
+/// replayed, already-rotated token can be detected. Logout sets `revokedAt`.
+/// Populated/consumed by the auth flow in Phase 2.
+model RefreshToken {
+  id             String    @id @default(cuid())
+  userId         String
+  jtiHash        String    @unique
+  expiresAt      DateTime
+  revokedAt      DateTime?
+  replacedById   String?
+  // M11: the session's active workspace (client-only multi-workspace). Session
+  // state, not user state — the same user can have different active workspaces
+  // per device/session. Null for owners/members (they have one workspace, so
+  // refresh falls back to user.tenantId). Not a FK: session metadata, short-lived.
+  activeTenantId String?
+  createdAt      DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("refresh_tokens")
+}
+
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  used      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+enum DeliverableStatus {
+  DRAFT
+  SUBMITTED
+  APPROVED
+  REVISION_REQUESTED
+}
+
+model Deliverable {
+  id          String            @id @default(cuid())
+  projectId   String
+  title       String
+  description String?
+  status      DeliverableStatus @default(DRAFT)
+
+  // Future-proofing for the Approval Workflow (M3): timestamps are set as the
+  // deliverable moves through its lifecycle; all nullable so M2 can leave the
+  // ones it doesn't own (approvedAt) untouched. dueDate is an optional target
+  // date the freelancer can set on a deliverable.
+  dueDate     DateTime?
+  submittedAt DateTime?
+  approvedAt  DateTime?
+
+  // Denormalized pointer to the latest DeliverableVersion for cheap reads
+  // (1:1). Kept in sync whenever a new version is uploaded.
+  currentVersionId String? @unique
+
+  createdById String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  project          Project              @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdBy        User                 @relation("DeliverableCreator", fields: [createdById], references: [id])
+  currentVersion   DeliverableVersion?  @relation("CurrentVersion", fields: [currentVersionId], references: [id], onDelete: SetNull)
+  versions         DeliverableVersion[] @relation("DeliverableVersions")
+  revisionRequests RevisionRequest[]
+
+  @@index([projectId])
+  @@index([status])
+  @@map("deliverables")
+}
+
+model DeliverableVersion {
+  id            String @id @default(cuid())
+  deliverableId String
+  versionNumber Int
+
+  // File is stored via the existing S3 StorageProvider abstraction; we keep
+  // the storage key plus display metadata (matches the blueprint's
+  // deliverable_versions.file_path intent while reusing our storage layer).
+  storageKey   String @unique
+  originalName String
+  mimeType     String
+  size         Int
+
+  // Optional note describing what changed in this version — written by the
+  // uploader and, from M3 onward, surfaced alongside revision requests.
+  changeSummary String?
+
+  uploadedById String
+  uploadedAt   DateTime @default(now())
+
+  deliverable      Deliverable       @relation("DeliverableVersions", fields: [deliverableId], references: [id], onDelete: Cascade)
+  uploadedBy       User              @relation("DeliverableVersionUploader", fields: [uploadedById], references: [id])
+  currentOf        Deliverable?      @relation("CurrentVersion")
+  revisionRequests RevisionRequest[]
+
+  @@unique([deliverableId, versionNumber])
+  @@index([deliverableId])
+  @@map("deliverable_versions")
+}
+
+enum RevisionStatus {
+  OPEN
+  RESOLVED
+}
+
+enum DecisionCategory {
+  SCOPE
+  TIMELINE
+  BUDGET
+  DESIGN
+  OTHER
+}
+
+enum DecisionSourceType {
+  MANUAL
+  APPROVAL
+  SCOPE_CHANGE
+  MEETING_NOTE
+}
+
+model RevisionRequest {
+  id                   String         @id @default(cuid())
+  deliverableId        String
+  deliverableVersionId String
+  requestedById        String
+  comment              String
+  status               RevisionStatus @default(OPEN)
+  createdAt            DateTime       @default(now())
+  resolvedAt           DateTime?
+
+  deliverable        Deliverable        @relation(fields: [deliverableId], references: [id], onDelete: Cascade)
+  deliverableVersion DeliverableVersion @relation(fields: [deliverableVersionId], references: [id], onDelete: Cascade)
+  requestedBy        User               @relation("RevisionRequester", fields: [requestedById], references: [id])
+
+  @@index([deliverableId])
+  @@index([deliverableVersionId])
+  @@index([status])
+  @@map("revision_requests")
+}
+
+model DecisionLog {
+  id          String             @id @default(cuid())
+  projectId   String
+  category    DecisionCategory
+  customCategory String?
+  description String
+  sourceType  DecisionSourceType
+  sourceId    String?
+  loggedById  String?
+  createdAt   DateTime           @default(now())
+
+  project  Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  loggedBy User?   @relation("DecisionLogger", fields: [loggedById], references: [id])
+
+  @@index([projectId])
+  @@index([category])
+  @@index([createdAt])
+  @@map("decision_log")
+}
+
+/// Structured Requirements (blueprint §3.2.4 / §6.2.8). Rows here are the
+/// CONFIRMED output of the Requirement Extractor — the AI proposes candidates
+/// as strict JSON, the freelancer reviews (accept/edit/reject), and only
+/// confirmed items are persisted, so there is deliberately no "pending" status
+/// column (the review queue lives before persistence). `isBaseline` flips true
+/// when the freelancer clicks "Set as Baseline Scope"; that baseline set is the
+/// reference point M7's scope-creep detection will diff against.
+/// `category` is a free string validated against an env-driven allow-list
+/// (RequirementConfig) rather than a Prisma enum, matching the blueprint's
+/// VARCHAR(50) so new categories need no migration. `sourceFileId` reuses the
+/// existing ProjectFile as the "document" (project decision: no separate
+/// Document model); it is nullable because a requirement can originate from
+/// pasted text or a meeting note rather than an uploaded file.
+model Requirement {
+  id            String   @id @default(cuid())
+  projectId     String
+  title         String
+  description   String?
+  category      String?
+  isBaseline    Boolean  @default(false)
+  sourceExcerpt String?
+  sourceFileId  String?
+  createdAt     DateTime @default(now())
+
+  project    Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  sourceFile ProjectFile? @relation(fields: [sourceFileId], references: [id], onDelete: SetNull)
+
+  // Scope flags raised ON this requirement (as the candidate being classified).
+  scopeFlags        ScopeFlag[] @relation("ScopeFlagRequirement")
+  // Scope flags that point AT this requirement as their nearest baseline match.
+  relatedScopeFlags ScopeFlag[] @relation("ScopeFlagRelatedBaseline")
+
+  @@index([projectId])
+  @@index([projectId, isBaseline])
+  @@map("requirements")
+}
+
+/// Scope Creep Detection flags (blueprint §3.2.6 / §6.2.15 / pipeline §8.10).
+/// One row per flagged requirement: the deterministic pre-filter + LLM
+/// classification (M7 Phase 2) writes it with resolution `pending`; the
+/// freelancer later actions it (M7 Phase 3). `classification` and `resolution`
+/// are free strings validated against ScopeConfig (same pattern as
+/// requirements.category — no enum migration to tune values). `requirementId`
+/// is the candidate (a non-baseline requirement); `relatedBaselineId` is the
+/// nearest baseline requirement the LLM matched (pipeline output, nullable).
+/// @@unique on requirementId keeps exactly one active flag per requirement so
+/// re-running a comparison upserts rather than duplicating.
+model ScopeFlag {
+  id                String   @id @default(cuid())
+  projectId         String
+  requirementId     String   @unique
+  classification    String
+  similarityScore   Float
+  rationale         String
+  resolution        String   @default("pending")
+  relatedBaselineId String?
+  createdAt         DateTime @default(now())
+
+  project         Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  requirement     Requirement  @relation("ScopeFlagRequirement", fields: [requirementId], references: [id], onDelete: Cascade)
+  relatedBaseline Requirement? @relation("ScopeFlagRelatedBaseline", fields: [relatedBaselineId], references: [id], onDelete: SetNull)
+
+  @@index([projectId])
+  @@index([resolution])
+  @@map("scope_flags")
+}
+
+/// Meeting Notes (blueprint §3.2.7 / §6.2.11 + Meeting Notes v2). `rawText` is
+/// the TRANSCRIPT — either pasted text or the output of BROWSER-side Whisper
+/// transcription (the original audio/video is NEVER uploaded or stored; only the
+/// transcript text reaches the server). `summary` plus the two `proposed*` JSON
+/// columns hold the single-call AI output (summary + extracted decisions +
+/// action items) as a REVIEW QUEUE — nothing becomes a permanent ActionItem /
+/// DecisionLog record until a human confirms (mirrors the requirement
+/// propose→confirm flow). `status` drives the async extraction job the client
+/// polls; `TRANSCRIBING` is reserved for a future server-side transcription
+/// provider (browser V1 creates the note already at `EXTRACTING`). The summary is
+/// indexed into the unified retrieval index as a first-class MEETING_NOTE source.
+model MeetingNote {
+  id                  String            @id @default(cuid())
+  projectId           String
+  rawText             String
+  summary             String?
+  status              MeetingNoteStatus @default(READY)
+  error               String?
+  transcriptSource    String?
+  proposedDecisions   Json?
+  proposedActionItems Json?
+  createdById         String
+  createdAt           DateTime          @default(now())
+
+  project     Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdBy   User         @relation("MeetingNoteCreator", fields: [createdById], references: [id])
+  actionItems ActionItem[]
+
+  @@index([projectId])
+  @@index([createdById])
+  @@map("meeting_notes")
+}
+
+enum MeetingNoteStatus {
+  TRANSCRIBING
+  EXTRACTING
+  READY
+  FAILED
+}
+
+enum ActionItemStatus {
+  OPEN
+  DONE
+}
+
+/// Structured Action Items extracted from a meeting (Meeting Notes v2). Rows here
+/// are the CONFIRMED output of the meeting extraction — the AI proposes them as
+/// JSON on the MeetingNote (`proposedActionItems`), a human reviews/edits, and
+/// only confirmed items are persisted here (same philosophy as Requirement: no
+/// "pending" status, the review queue lives before persistence). `owner` and
+/// `dueDate` are free/nullable because the AI must never invent them — they are
+/// set only when explicitly present in the transcript.
+model ActionItem {
+  id            String           @id @default(cuid())
+  projectId     String
+  meetingNoteId String
+  description   String
+  owner         String?
+  // Free text ("by Thursday", "end of next week"), NOT a timestamp: meeting due
+  // dates are relative and must be stored verbatim — never a guessed/parsed date.
+  dueDate       String?
+  status        ActionItemStatus @default(OPEN)
+  createdAt     DateTime         @default(now())
+
+  project     Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  meetingNote MeetingNote @relation(fields: [meetingNoteId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+  @@index([meetingNoteId])
+  @@map("action_items")
+}
